@@ -128,3 +128,210 @@ Get-AuthenticationFromFile -PasswordFile passwordfile.cfg -UserName johndoe@doma
     }
   }
 }
+
+
+function Test-Admin
+{
+  $wid = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+  $prp = New-Object System.Security.Principal.WindowsPrincipal($wid)
+  $adm = [System.Security.Principal.WindowsBuiltInRole]::Administrator
+  $prp.IsInRole($adm)  
+}
+
+function Show-OpenFileDialog
+{
+ [CmdletBinding()]
+
+  param([Parameter(
+      Position = 1,
+      Mandatory = $false,
+      ValueFromPipeline = $true,
+      ValueFromPipelineByPropertyName = $true)]
+    [string]$InitialDirectory,
+    [Parameter(
+      Position = 2,
+      Mandatory = $false,
+      ValueFromPipeline = $true,
+      ValueFromPipelineByPropertyName = $true)]
+    [bool]$MultiSelect)
+
+    begin
+    {
+
+    Add-Type -AssemblyName System.Windows.Forms
+    }
+  process {
+  $FileBrowser = New-Object System.Windows.Forms.OpenFileDialog -Property @{
+    InitialDirectory = $InitialDirectory
+    Multiselect = $MultiSelect
+}
+ 
+[void]$FileBrowser.ShowDialog()
+write-output $FileBrowser.FileNames
+ }
+
+}
+
+
+function Write-ConfigToFile
+{
+<#
+.SYNOPSIS
+Writes a config object as JSON to file.
+
+.DESCRIPTION
+This is a config object for script automation.  
+
+.PARAMETER ConfigFile
+Path to the file where the config is stored.
+
+.PARAMETER ConfigObject
+For display purposes, the username.
+
+.PARAMETER Force
+If the file exists then overwrite.
+
+.OUTPUTS
+Success status. 
+
+.EXAMPLE
+Write-ConfigToFile -ConfigFile MyProgram.cfg -ConfigObject $SessionConfig
+
+.EXAMPLE
+$SessionConfig | Write-ConfigToFile -ConfigFile MyProgram.cfg 
+
+.EXAMPLE
+This is an example of a config object.
+
+$SessionConfig = New-Object -TypeName PSObject
+$SessionConfig | add-member -membertype NoteProperty -name ServiceName -Value "Office365"
+$SessionConfig | add-member -membertype NoteProperty -name InstanceName -Value "MyInstance"
+$SessionConfig | add-member -membertype NoteProperty -name Username -Value "username@domain.onmicrosoft.com"
+$SessionConfig | add-member -membertype NoteProperty -name PasswordFileName -Value "userpasswordfile.txt"
+$SessionConfig | add-member -membertype NoteProperty -name SharepointURL -Value "domain.sharepoint.com"
+
+$SessionConfig | Write-ConfigToFile -ConfigFile MyProgram.cfg 
+
+
+#>
+[CmdletBinding()]
+
+Param( [Parameter(
+Position=1,
+Mandatory=$true,
+ValueFromPipeline=$false,
+ValueFromPipelineByPropertyName=$true)]
+[String] $ConfigFile, 
+       [Parameter(
+Position=2,
+Mandatory=$true,
+ValueFromPipeline=$true,
+ValueFromPipelineByPropertyName=$true)]
+[String] $ConfigObject,
+
+[switch] $Force)
+       
+PROCESS{
+       if((Test-Path $ConfigFile) -and (!($Foce))) 
+       {
+         Write-Debug "File exists. Overwrite not selected."
+         Write-Output $false
+       } else {
+         ConvertTo-Json -InputObject $ConfigObject | Out-File -FilePath $ConfigFile
+         Write-Output $true
+       }
+}
+}
+
+
+
+
+
+function Read-ConfigFromFile
+{
+<#
+.SYNOPSIS
+Reads a config object as JSON from file.
+
+.DESCRIPTION
+This is a config object for script automation.  
+
+.PARAMETER ConfigFile
+Path to the file where the config is stored.
+
+.OUTPUTS
+Config Object. 
+
+.EXAMPLE
+Read-ConfigFromFile -ConfigFile MyProgram.cfg 
+
+.EXAMPLE
+$ConfigObject = Read-ConfigFromFile -ConfigFile MyProgram.cfg 
+
+
+#>
+[CmdletBinding()]
+
+Param( [Parameter(
+Position=1,
+Mandatory=$true,
+ValueFromPipeline=$true,
+ValueFromPipelineByPropertyName=$true)]
+[String] $ConfigFile)
+       
+PROCESS{
+Write-Output (ConvertFrom-Json -InputObject ((Get-Content $ConfigFile) -join "`n"))
+}
+
+}
+
+
+
+function Start-SPOLibraries {
+
+[CmdletBinding()]
+Param ()
+
+PROCESS {
+#Add references to SharePoint client assemblies and authenticate to Office 365 site - required for CSOM
+Add-Type -Path "C:\Program Files\Common Files\Microsoft Shared\Web Server Extensions\15\ISAPI\Microsoft.SharePoint.Client.dll"
+Add-Type -Path "C:\Program Files\Common Files\Microsoft Shared\Web Server Extensions\15\ISAPI\Microsoft.SharePoint.Client.Runtime.dll"
+}
+}
+
+function Get-SPOCredSet {
+[CmdletBinding()]
+Param( [Parameter(
+Position=1,
+Mandatory=$true,
+ValueFromPipeline=$true,
+ValueFromPipelineByPropertyName=$true)]
+[String] $Username,
+[Parameter(
+Position=2,
+Mandatory=$true,
+ValueFromPipeline=$true,
+ValueFromPipelineByPropertyName=$true)]
+[System.Security.SecureString] $Password)
+
+PROCESS {
+$Credset = New-Object Microsoft.SharePoint.Client.SharePointOnlineCredentials($Username, $Password)
+Write-Output $Credset
+}
+}
+
+function Get-SPOContext {
+[CmdletBinding()]
+Param( [Parameter(
+Position=1,
+Mandatory=$true,
+ValueFromPipeline=$true,
+ValueFromPipelineByPropertyName=$true)]
+[String] $URL)
+
+PROCESS {
+$Context = New-Object Microsoft.SharePoint.Client.ClientContext($URL)
+Write-Output $Context
+}
+}
+
